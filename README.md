@@ -9,5 +9,4 @@ Under development.
 ---
 
 - Basic pipeline implementation complete.
-- support for LUI/AUIPC dropped.
 - Hazards handling / branch control under implementation. 
