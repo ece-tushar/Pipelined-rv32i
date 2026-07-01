@@ -1,5 +1,5 @@
-0000000c  // WA0 - a = 12   
-00000007  // WA1 - b = 8
+0000000c   // address 0   
+00000007   // address 1
 fffffff4   // address 2
 00000005   // address 3
 000000ff   // address 4
