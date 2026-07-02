@@ -1,3 +1,78 @@
+module PipelineControl(
+    input  logic StallReq,
+
+    output logic PC_WEn,
+    output logic IF_ID_WEn,
+    output logic ID_EX_Flush
+);
+
+assign PC_WEn      = ~StallReq;
+assign IF_ID_WEn   = ~StallReq;
+assign ID_EX_Flush =  StallReq;
+
+endmodule
+
+
+
+
+module LoadHazardUnit # (
+    parameter DATA_WIDTH = 32,
+    
+    parameter [6:0]
+        Rtype      = 7'b0110011,
+        R_Itype    = 7'b0010011,
+        Load_Itype = 7'b0000011,
+        Stype      = 7'b0100011,
+        Btype      = 7'b1100011,
+        LUI        = 7'b0110111,
+        AUIPC      = 7'b0010111,
+        JAL_Jtype  = 7'b1101111,
+        JALR_Itype = 7'b1100111,
+        Envi_Itype = 7'b1110011
+
+    )(
+    input logic [DATA_WIDTH-1:0] EX_IM_Instr,
+    input logic [DATA_WIDTH-1:0] ID_IM_Instr,
+    
+    output logic StallReq
+    );
+    
+    logic [6:0] n_opcode, n_1_opcode;
+    logic [4:0] n_rs1, n_rs2;
+    logic [4:0] n_1_rd;
+    
+    assign n_opcode = ID_IM_Instr[6:0];
+    assign n_rs1 = ID_IM_Instr[19:15];
+    assign n_rs2 = ID_IM_Instr[24:20];
+    
+    assign n_1_opcode = EX_IM_Instr[6:0];
+    assign n_1_rd = EX_IM_Instr[11:7];
+
+    always_comb begin
+    StallReq = 0;
+    
+        case (n_opcode)
+    
+        Rtype: begin
+            if ((n_1_opcode == Load_Itype) &&
+                (n_1_rd != 5'd0) &&
+                ((n_1_rd == n_rs1) || (n_1_rd == n_rs2)))
+                StallReq = 1;
+        end
+    
+        R_Itype: begin
+            if ((n_1_opcode == Load_Itype) &&
+                (n_1_rd != 5'd0) &&
+                (n_1_rd == n_rs1))
+                StallReq = 1;
+        end
+    
+        endcase
+    end
+    
+
+endmodule
+
 module ForwardingUnit # (
     parameter DATA_WIDTH = 32,
     
@@ -527,7 +602,7 @@ module PCBlock#(
    parameter DATA_WIDTH = 8
     )(
     input SelAdderPC,SelDataInPC,
-    input Clk,Rst,
+    input Clk,Rst,PC_WEn,
     input [DATA_WIDTH-1:0] Immediate,
     input [DATA_WIDTH-1:0] MainALUData,
     output [DATA_WIDTH-1:0] PCnext,
@@ -558,7 +633,7 @@ module PCBlock#(
      
     ProgCounter #(.DATA_WIDTH(DATA_WIDTH)) PC
                   (.DataInPC(temp_mux2_pc),
-                    .Clk(Clk),.Rst(Rst),
+                    .Clk(Clk),.Rst(Rst),.WEn(PC_WEn),
                     .AddrOutPC(AddrOutPC));         
     
 endmodule
