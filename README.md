@@ -8,3 +8,4 @@ Under development.
 - Basic pipeline implementation complete.
 - Hazards handling / branch control under implementation.
 - Moved from ID stage decoding to per stage decoding, simplifes later upgradations. 
+- Added R/R-I type Forwarding unit
