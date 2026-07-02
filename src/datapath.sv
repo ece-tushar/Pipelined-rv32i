@@ -44,8 +44,8 @@ module DataPath #(
 
 struct packed {
     struct packed {
-        logic       SelMuxALU;
-        logic       SelMuxALU0;
+        logic [1:0] SelOprd1;
+        logic [1:0] SelOprd2;
         logic [3:0] ALUSelFunc;
         logic       SelAdderPC;
         logic       SelDataInPC;
@@ -77,8 +77,8 @@ struct packed {
 
     wire [DATA_WIDTH-1:0] IG_ImmOut;
 
-    wire [DATA_WIDTH-1:0] MUX_ALU_DataOut;
-    wire [DATA_WIDTH-1:0] MUX_ALU_DataOut0;
+    wire [DATA_WIDTH-1:0] MUX_ALU_DataOut2;
+    wire [DATA_WIDTH-1:0] MUX_ALU_DataOut1;
 
     wire [DATA_WIDTH-1:0] DM_DataOut;
 
@@ -178,14 +178,12 @@ struct packed {
         .Flush(1'b0),
 
         .PC4_in(ID_PC_PCnext),
-        .Rd_addr_in(ID_IM_Instr[11:7]),
         .Rs1_in(RB_DataOut1),
         .Rs2_in(RB_DataOut2),
         .Imm_in(IG_ImmOut),
         .IM_in(ID_IM_Instr),
 
         .PC4_out(EX_PC_PCnext),
-        .Rd_addr_out(EX_IM_Instr[11:7]),
         .Rs1_out(EX_RB_DataOut1),
         .Rs2_out(EX_RB_DataOut2),
         .Imm_out(EX_IG_ImmOut),
@@ -197,22 +195,39 @@ struct packed {
 // E X E C U T E 
 //==================================================
 
-     mux2to1 # (.DATA_WIDTH(32)) 
-    MUX_ALU0 (.DataIn0(EX_RB_DataOut1),
-           .DataIn1({{(DATA_WIDTH-PC_DATA_WIDTH){1'b0}},ID_PC_RAddr}),  // PC isn't pipelined so dropped LUI / AUIPC
-           .Sel(Ctrl.EX_out.SelMuxALU0),
-           .DataOut(MUX_ALU_DataOut0));
+//     mux2to1 # (.DATA_WIDTH(32)) 
+//    MUX_ALU0 (.DataIn0(EX_RB_DataOut1),
+//           .DataIn1({{(DATA_WIDTH-PC_DATA_WIDTH){1'b0}},ID_PC_RAddr}),  // PC isn't pipelined so dropped LUI / AUIPC
+//           .Sel(Ctrl.EX_out.SelMuxALU0),
+//           .DataOut(MUX_ALU_DataOut0));
+   
+       mux4to1 #(.DATA_WIDTH(32)) 
+       MUX_ALU1 (.DataIn0(EX_RB_DataOut1),
+               .DataIn1({{(DATA_WIDTH-PC_DATA_WIDTH){1'b0}},ID_PC_RAddr}),
+               .DataIn2(MEM_ALU_DataOut),
+               .DataIn3(MUX_RB_DataOut),
+               .Sel(Ctrl.EX_out.SelOprd1),
+               .DataOut(MUX_ALU_DataOut1));
+
+       mux4to1 #(.DATA_WIDTH(32)) 
+       MUX_ALU2 (.DataIn0(EX_RB_DataOut2),
+               .DataIn1(EX_IG_ImmOut),
+               .DataIn2(MEM_ALU_DataOut),
+               .DataIn3(MUX_RB_DataOut),
+               .Sel(Ctrl.EX_out.SelOprd2),
+               .DataOut(MUX_ALU_DataOut2));                      
+
     
     
-    mux2to1 # (.DATA_WIDTH(32)) 
-           MUX_ALU (.DataIn0(EX_RB_DataOut2),
-                  .DataIn1(EX_IG_ImmOut),
-                  .Sel(Ctrl.EX_out.SelMuxALU),
-                  .DataOut(MUX_ALU_DataOut));
+//    mux2to1 # (.DATA_WIDTH(32)) 
+//           MUX_ALU (.DataIn0(EX_RB_DataOut2),
+//                  .DataIn1(EX_IG_ImmOut),
+//                  .Sel(Ctrl.EX_out.SelMuxALU),
+//                  .DataOut(MUX_ALU_DataOut2));
 
 
-     ALU ALU_UUT (.DataIn1(MUX_ALU_DataOut0),
-                  .DataIn2(MUX_ALU_DataOut),
+     ALU ALU_UUT (.DataIn1(MUX_ALU_DataOut1),
+                  .DataIn2(MUX_ALU_DataOut2),
                   .SelFunc(Ctrl.EX_out.ALUSelFunc),
                   .DataOut(ALU_DataOut));
                   
@@ -229,8 +244,8 @@ struct packed {
                         // EX
                         .SelAdderPC(Ctrl.EX_out.SelAdderPC),
                         .SelDataInPC(Ctrl.EX_out.SelDataInPC),
-                        .SelMuxALU(Ctrl.EX_out.SelMuxALU),
-                        .SelMuxALU0(Ctrl.EX_out.SelMuxALU0),
+                        .SelMuxALU(),
+                        .SelMuxALU0(),
                         .ALUSelFunc(Ctrl.EX_out.ALUSelFunc),
                         // MEM
                         .SignExtd(),
@@ -241,19 +256,27 @@ struct packed {
                         .RegBankWEn(),
                         .SelRegBankDataIn()
                               );
+                              
+            ForwardingUnit FU (
+                         .EX_IM_Instr (EX_IM_Instr),
+                         .MEM_IM_Instr(MEM_IM_Instr),
+                         .WB_IM_Instr (WB_IM_Instr),
+                              
+                         .SelOprd1(Ctrl.EX_out.SelOprd1),
+                         .SelOprd2(Ctrl.EX_out.SelOprd2)
+                              );
+
 pipe_EX_MEM EX_MEM (
                       .Clk(Clk),
                       .Rst(Rst),
                       .Flush(1'b0),
                   
                       .PC4_in(EX_PC_PCnext),
-                      .Rd_addr_in(EX_IM_Instr[11:7]),
                       .Rs2_in(EX_RB_DataOut2),
                       .ALU_in(ALU_DataOut),
                       .IM_in(EX_IM_Instr),
                   
                       .PC4_out(MEM_PC_PCnext),
-                      .Rd_addr_out(MEM_IM_Instr[11:7]),
                       .Rs2_out(MEM_RB_DataOut2),
                       .ALU_out(MEM_ALU_DataOut),
                       .IM_out(MEM_IM_Instr)
@@ -312,13 +335,11 @@ pipe_EX_MEM EX_MEM (
                 .Flush(1'b0),
 
                 .PC4_in(MEM_PC_PCnext),
-                .Rd_addr_in(MEM_IM_Instr[11:7]),
                 .ALU_in(MEM_ALU_DataOut),
                 .DM_in(SE_DataOut),
                 .IM_in(MEM_IM_Instr),
 
                 .PC4_out(WB_PC_PCnext),
-                .Rd_addr_out(WB_IM_Instr[11:7]),
                 .ALU_out(WB_ALU_DataOut),
                 .DM_out(WB_SE_DataOut),
                 .IM_out(WB_IM_Instr)
