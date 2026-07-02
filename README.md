@@ -5,8 +5,6 @@ Under development.
 - Adder ID_EX pipeline registers
 - Dropped support for LUI/AUIPC for now.
 - branches/jumps will be impplemented after complete pipeline implementation. 
-
----
-
 - Basic pipeline implementation complete.
-- Hazards handling / branch control under implementation. 
+- Hazards handling / branch control under implementation.
+- Moved from ID stage decoding to per stage decoding, simplifes later upgradations. 
