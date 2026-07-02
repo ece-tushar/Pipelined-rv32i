@@ -1,6 +1,8 @@
 // Dropping support for LUI/AUIPC. 
 // Jalr doesn't mask the last bit. 
 
+// simplify the control units for each stage later, old code reused right now. 
+
 module DataPath #(
     parameter DATA_WIDTH=32,
     parameter PC_DATA_WIDTH=8,
@@ -47,23 +49,23 @@ struct packed {
         logic [3:0] ALUSelFunc;
         logic       SelAdderPC;
         logic       SelDataInPC;
-    } IDEX_EX_in, IDEX_EX_out;
+    } EX_out;
 
     struct packed {
         logic       DataMemWEn;
         logic [1:0] DataMemWDataType;
         logic [1:0] DataMemRDataType;
         logic       SignExtd;
-    } IDEX_MEM_in, IDEX_MEM_out, EXMEM_MEM_out;
+    } MEM_out;
 
     struct packed {
         logic       RegBankWEn;
         logic [1:0] SelRegBankDataIn;
-    } IDEX_WB_in, IDEX_WB_out,EXMEM_WB_out, MEMWB_WB_out;
+    } WB_out;
 
     struct packed {
         logic [6:0] ImmInstrType;
-    } ID;
+    } ID_out;
 } Ctrl;
 
 
@@ -91,8 +93,8 @@ struct packed {
 //============================================================
 
 
-     PCBlock PC (.SelAdderPC(Ctrl.IDEX_EX_out.SelAdderPC),
-                 .SelDataInPC(Ctrl.IDEX_EX_out.SelDataInPC),
+     PCBlock PC (.SelAdderPC(Ctrl.EX_out.SelAdderPC),
+                 .SelDataInPC(Ctrl.EX_out.SelDataInPC),
                  .Clk(Clk),
                  .Rst(Rst), 
                  .Immediate(EX_IG_ImmOut[7:0]),   
@@ -129,46 +131,40 @@ struct packed {
 //============================================================
      
      ImmGen       IG (.ImmIn(ID_IM_Instr[31:7]),
-                 .ImmInstrType(Ctrl.ID.ImmInstrType),
+                 .ImmInstrType(Ctrl.ID_out.ImmInstrType),
                  .ImmOut(IG_ImmOut)
                  );
  
-     InstrDecoder ID (.InstrCodes({ID_IM_Instr[31:25], //F7|F3|OP
-                              ID_IM_Instr[14:12],
-                              ID_IM_Instr[6:0]}),
-                 .ControlKey(ID_ControlKey));   
-     
-
-                        
-        Controller CTRL (
-                     .ControlKey(ID_ControlKey),
+     ControlUnit CUID (
+                     .InstrCodes({
+                         ID_IM_Instr[31:25],   // funct7
+                         ID_IM_Instr[14:12],   // funct3
+                         ID_IM_Instr[6:0]      // opcode
+                     }),
                  
+                     .ALUOutLSB(ALU_DataOut[0]),
                      // ID
-                     .ImmInstrType(Ctrl.ID.ImmInstrType),
-                 
+                     .ImmInstrType(Ctrl.ID_out.ImmInstrType),
                      // EX
-                     .ALUOutLSB(ALU_DataOut[0]), //<-------->
-                     .SelAdderPC(Ctrl.IDEX_EX_in.SelAdderPC),
-                     .SelDataInPC(Ctrl.IDEX_EX_in.SelDataInPC),
-                     .SelMuxALU(Ctrl.IDEX_EX_in.SelMuxALU),
-                     .SelMuxALU0(Ctrl.IDEX_EX_in.SelMuxALU0),
-                     .ALUSelFunc(Ctrl.IDEX_EX_in.ALUSelFunc),
-                 
+                     .SelAdderPC(),
+                     .SelDataInPC(),
+                     .SelMuxALU(),
+                     .SelMuxALU0(),
+                     .ALUSelFunc(),
                      // MEM
-                     .SignExtd(Ctrl.IDEX_MEM_in.SignExtd),
-                     .DataMemWEn(Ctrl.IDEX_MEM_in.DataMemWEn),
-                     .DataMemRDataType(Ctrl.IDEX_MEM_in.DataMemRDataType),
-                     .DataMemWDataType(Ctrl.IDEX_MEM_in.DataMemWDataType),
-                 
+                     .SignExtd(),
+                     .DataMemWEn(),
+                     .DataMemRDataType(),
+                     .DataMemWDataType(),
                      // WB
-                     .RegBankWEn(Ctrl.IDEX_WB_in.RegBankWEn),
-                     .SelRegBankDataIn(Ctrl.IDEX_WB_in.SelRegBankDataIn)
+                     .RegBankWEn(),
+                     .SelRegBankDataIn()
                  );
 
      RegBank32 RB (.DataIn(MUX_RB_DataOut),
                    .Clk(Clk),
                    .Rst(Rst), 
-                   .WEn(Ctrl.MEMWB_WB_out.RegBankWEn),
+                   .WEn(Ctrl.WB_out.RegBankWEn),
                    .RAddr1(ID_IM_Instr[19:15]),
                    .RAddr2(ID_IM_Instr[24:20]),
                    .WAddr(WB_IM_Instr[11:7]),
@@ -186,14 +182,14 @@ struct packed {
         .Rs1_in(RB_DataOut1),
         .Rs2_in(RB_DataOut2),
         .Imm_in(IG_ImmOut),
-        .Ctrl_in({Ctrl.IDEX_EX_in,Ctrl.IDEX_MEM_in,Ctrl.IDEX_WB_in}),
+        .IM_in(ID_IM_Instr),
 
         .PC4_out(EX_PC_PCnext),
         .Rd_addr_out(EX_IM_Instr[11:7]),
         .Rs1_out(EX_RB_DataOut1),
         .Rs2_out(EX_RB_DataOut2),
         .Imm_out(EX_IG_ImmOut),
-        .Ctrl_out({Ctrl.IDEX_EX_out,Ctrl.IDEX_MEM_out,Ctrl.IDEX_WB_out})
+        .IM_out(EX_IM_Instr)
 );
 
 
@@ -204,22 +200,47 @@ struct packed {
      mux2to1 # (.DATA_WIDTH(32)) 
     MUX_ALU0 (.DataIn0(EX_RB_DataOut1),
            .DataIn1({{(DATA_WIDTH-PC_DATA_WIDTH){1'b0}},ID_PC_RAddr}),  // PC isn't pipelined so dropped LUI / AUIPC
-           .Sel(Ctrl.IDEX_EX_out.SelMuxALU0),
+           .Sel(Ctrl.EX_out.SelMuxALU0),
            .DataOut(MUX_ALU_DataOut0));
     
     
     mux2to1 # (.DATA_WIDTH(32)) 
            MUX_ALU (.DataIn0(EX_RB_DataOut2),
                   .DataIn1(EX_IG_ImmOut),
-                  .Sel(Ctrl.IDEX_EX_out.SelMuxALU),
+                  .Sel(Ctrl.EX_out.SelMuxALU),
                   .DataOut(MUX_ALU_DataOut));
 
 
      ALU ALU_UUT (.DataIn1(MUX_ALU_DataOut0),
                   .DataIn2(MUX_ALU_DataOut),
-                  .SelFunc(Ctrl.IDEX_EX_out.ALUSelFunc),
+                  .SelFunc(Ctrl.EX_out.ALUSelFunc),
                   .DataOut(ALU_DataOut));
                   
+     ControlUnit CUEX (
+                        .InstrCodes({
+                            EX_IM_Instr[31:25],   // funct7
+                            EX_IM_Instr[14:12],   // funct3
+                            EX_IM_Instr[6:0]      // opcode
+                                  }),
+                              
+                        .ALUOutLSB(ALU_DataOut[0]),
+                        // ID
+                        .ImmInstrType(),
+                        // EX
+                        .SelAdderPC(Ctrl.EX_out.SelAdderPC),
+                        .SelDataInPC(Ctrl.EX_out.SelDataInPC),
+                        .SelMuxALU(Ctrl.EX_out.SelMuxALU),
+                        .SelMuxALU0(Ctrl.EX_out.SelMuxALU0),
+                        .ALUSelFunc(Ctrl.EX_out.ALUSelFunc),
+                        // MEM
+                        .SignExtd(),
+                        .DataMemWEn(),
+                        .DataMemRDataType(),
+                        .DataMemWDataType(),
+                        // WB
+                        .RegBankWEn(),
+                        .SelRegBankDataIn()
+                              );
 pipe_EX_MEM EX_MEM (
                       .Clk(Clk),
                       .Rst(Rst),
@@ -229,13 +250,13 @@ pipe_EX_MEM EX_MEM (
                       .Rd_addr_in(EX_IM_Instr[11:7]),
                       .Rs2_in(EX_RB_DataOut2),
                       .ALU_in(ALU_DataOut),
-                      .Ctrl_in({Ctrl.IDEX_MEM_out,Ctrl.IDEX_WB_out}),
+                      .IM_in(EX_IM_Instr),
                   
                       .PC4_out(MEM_PC_PCnext),
                       .Rd_addr_out(MEM_IM_Instr[11:7]),
                       .Rs2_out(MEM_RB_DataOut2),
                       .ALU_out(MEM_ALU_DataOut),
-                      .Ctrl_out({Ctrl.EXMEM_MEM_out,Ctrl.EXMEM_WB_out})
+                      .IM_out(MEM_IM_Instr)
                   );
     
 //==================================================
@@ -245,18 +266,45 @@ pipe_EX_MEM EX_MEM (
            
      ByteAdrRAM DM (.DataIn(MEM_RB_DataOut2),  
                .Clk(Clk),
-               .WEn(Ctrl.EXMEM_MEM_out.DataMemWEn),
-               .WDataType(Ctrl.EXMEM_MEM_out.DataMemWDataType),
-               .RDataType(Ctrl.EXMEM_MEM_out.DataMemRDataType),
+               .WEn(Ctrl.MEM_out.DataMemWEn),
+               .WDataType(Ctrl.MEM_out.DataMemWDataType),
+               .RDataType(Ctrl.MEM_out.DataMemRDataType),
                .WAddr(MEM_ALU_DataOut[7:0]),
                .RAddr(MEM_ALU_DataOut[7:0]),
                .DataOut(DM_DataOut));
 
 
          SignExtender SE (.DataIn(DM_DataOut),
-                   .DataType(Ctrl.EXMEM_MEM_out.DataMemRDataType),
-                   .SignExtd(Ctrl.EXMEM_MEM_out.SignExtd),
+                   .DataType(Ctrl.MEM_out.DataMemRDataType),
+                   .SignExtd(Ctrl.MEM_out.SignExtd),
                    .DataOut(SE_DataOut)); 
+
+     ControlUnit CUMEM (
+                     .InstrCodes({
+                         MEM_IM_Instr[31:25],   // funct7
+                         MEM_IM_Instr[14:12],   // funct3
+                         MEM_IM_Instr[6:0]      // opcode
+                     }),
+                 
+                     .ALUOutLSB(ALU_DataOut[0]),
+                     // ID
+                     .ImmInstrType(),
+                     // EX
+                     .SelAdderPC(),
+                     .SelDataInPC(),
+                     .SelMuxALU(),
+                     .SelMuxALU0(),
+                     .ALUSelFunc(),
+                      // MEM
+                     .SignExtd(Ctrl.MEM_out.SignExtd),
+                     .DataMemWEn(Ctrl.MEM_out.DataMemWEn),
+                     .DataMemRDataType(Ctrl.MEM_out.DataMemRDataType),
+                     .DataMemWDataType(Ctrl.MEM_out.DataMemWDataType),
+                     // WB
+                     .RegBankWEn(),
+                     .SelRegBankDataIn()
+                 );
+
 
         pipe_MEM_WB MEM_WB (
                 .Clk(Clk),
@@ -267,26 +315,54 @@ pipe_EX_MEM EX_MEM (
                 .Rd_addr_in(MEM_IM_Instr[11:7]),
                 .ALU_in(MEM_ALU_DataOut),
                 .DM_in(SE_DataOut),
-                .Ctrl_in(Ctrl.EXMEM_WB_out),
+                .IM_in(MEM_IM_Instr),
 
                 .PC4_out(WB_PC_PCnext),
                 .Rd_addr_out(WB_IM_Instr[11:7]),
                 .ALU_out(WB_ALU_DataOut),
                 .DM_out(WB_SE_DataOut),
-                .Ctrl_out(Ctrl.MEMWB_WB_out)
+                .IM_out(WB_IM_Instr)
                );
                
 //==================================================
 // W R I T E   B A C K
 //==================================================
 
+     ControlUnit CUWB (
+                 .InstrCodes({
+                    WB_IM_Instr[31:25],   // funct7
+                    WB_IM_Instr[14:12],   // funct3
+                    WB_IM_Instr[6:0]      // opcode
+                  }),
+                 
+                 .ALUOutLSB(ALU_DataOut[0]),
+                 // ID
+                 .ImmInstrType(),
+                     // EX
+                     .SelAdderPC(),
+                     .SelDataInPC(),
+                     .SelMuxALU(),
+                     .SelMuxALU0(),
+                     .ALUSelFunc(),
+                      // MEM
+                     .SignExtd(),
+                     .DataMemWEn(),
+                     .DataMemRDataType(),
+                     .DataMemWDataType(),
+                     // WB
+                     .RegBankWEn(Ctrl.WB_out.RegBankWEn),
+                     .SelRegBankDataIn(Ctrl.WB_out.SelRegBankDataIn)
+                 );
+
+    
+    
           
     mux4to1 #(.DATA_WIDTH(32)) 
             MUX_RB (.DataIn0(WB_ALU_DataOut),
                      .DataIn1(WB_SE_DataOut),
                      .DataIn2({{(DATA_WIDTH-PC_DATA_WIDTH){1'b0}}, WB_PC_PCnext}),
                      .DataIn3(EX_IG_ImmOut),
-                     .Sel(Ctrl.MEMWB_WB_out.SelRegBankDataIn),
+                     .Sel(Ctrl.WB_out.SelRegBankDataIn),
                      .DataOut(MUX_RB_DataOut));
                 
 
