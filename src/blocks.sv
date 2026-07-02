@@ -55,6 +55,62 @@ module ImmGen #(
         end
 endmodule
 
+module ControlUnit #(
+    parameter FUNC_WIDTH = 17
+)(
+    // funct7[16:10] | funct3[9:7] | opcode[6:0]
+    input  [FUNC_WIDTH-1:0] InstrCodes,
+    input                   ALUOutLSB,
+
+    // Outputs to Datapath
+    output [6:0] ImmInstrType,
+
+    output SelAdderPC,
+    output SelDataInPC,
+    output RegBankWEn,
+    output SelMuxALU,
+    output SelMuxALU0,
+    output SignExtd,
+    output DataMemWEn,
+
+    output [1:0] DataMemWDataType,
+    output [1:0] SelRegBankDataIn,
+    output [1:0] DataMemRDataType,
+
+    output [3:0] ALUSelFunc
+);
+
+    wire [FUNC_WIDTH-1:0] ControlKey;
+
+    InstrDecoder #(
+        .FUNC_WIDTH(FUNC_WIDTH)
+    ) decoder (
+        .InstrCodes(InstrCodes),
+        .ControlKey(ControlKey)
+    );
+
+    Controller controller (
+        .ControlKey(ControlKey),
+        .ALUOutLSB(ALUOutLSB),
+
+        .ImmInstrType(ImmInstrType),
+
+        .SelAdderPC(SelAdderPC),
+        .SelDataInPC(SelDataInPC),
+        .RegBankWEn(RegBankWEn),
+        .SelMuxALU(SelMuxALU),
+        .SelMuxALU0(SelMuxALU0),
+        .SignExtd(SignExtd),
+        .DataMemWEn(DataMemWEn),
+
+        .DataMemWDataType(DataMemWDataType),
+        .SelRegBankDataIn(SelRegBankDataIn),
+        .DataMemRDataType(DataMemRDataType),
+
+        .ALUSelFunc(ALUSelFunc)
+    );
+
+endmodule
 
 module Controller(
 //input structure : funct7[16:10]|funct3[9:7]|opcode[6:0]
