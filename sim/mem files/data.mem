@@ -1,4 +1,4 @@
-0000000c   // address 0   
+0000000c   // address 0  : WORD ADDRESS 
 00000007   // address 1
 fffffff4   // address 2
 00000005   // address 3
