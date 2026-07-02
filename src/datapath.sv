@@ -14,6 +14,7 @@ module DataPath #(
     input Clk, Rst,
     output [DATA_WIDTH-1:0] DataOut
     );
+    
     wire [PC_DATA_WIDTH-1:0] PC_RAddr;  // Into IF_ID
     wire [PC_DATA_WIDTH-1:0] PC_PCnext;
     wire [DATA_WIDTH-1:0] IM_Instr; // the entire instruction
@@ -69,7 +70,15 @@ struct packed {
 } Ctrl;
 
 
-
+    wire IF_ID_Flush;
+    wire ID_EX_Flush;
+    wire EX_MEM_Flush;
+    wire MEM_WB_Flush;
+    
+    wire StallReq;  // pipeline controller
+    wire PC_WEn;
+    wire IF_ID_WEn;
+    
     wire [DATA_WIDTH-1:0] ALU_DataOut;
 
     wire [DATA_WIDTH-1:0] RB_DataOut1;
@@ -85,7 +94,16 @@ struct packed {
     wire [DATA_WIDTH-1:0] SE_DataOut;
 
     wire [DATA_WIDTH-1:0] MUX_RB_DataOut;
-    
+ 
+ 
+ //----------PIPELINE CONTROLLER---------------
+ 
+ PipelineControl PCtrl (
+        .StallReq(StallReq),
+        .PC_WEn(PC_WEn),
+        .IF_ID_WEn(IF_ID_WEn),
+        .ID_EX_Flush(ID_EX_Flush)
+    );   
     
     
 //============================================================
@@ -96,7 +114,7 @@ struct packed {
      PCBlock PC (.SelAdderPC(Ctrl.EX_out.SelAdderPC),
                  .SelDataInPC(Ctrl.EX_out.SelDataInPC),
                  .Clk(Clk),
-                 .Rst(Rst), 
+                 .Rst(Rst),.PC_WEn(PC_WEn), 
                  .Immediate(EX_IG_ImmOut[7:0]),   
                  .PCnext(PC_PCnext),
                  .MainALUData(ALU_DataOut[7:0]),
@@ -116,6 +134,7 @@ struct packed {
                         .Clk    (Clk),
                         .Rst    (Rst),
                         .Flush  (1'b0),
+                        .WEn(IF_ID_WEn),
                     
                         .PC_in  (PC_RAddr),    
                         .PC4_in (PC_PCnext),
@@ -135,6 +154,12 @@ struct packed {
                  .ImmOut(IG_ImmOut)
                  );
  
+     LoadHazardUnit LHU (
+                     .EX_IM_Instr(EX_IM_Instr),
+                     .ID_IM_Instr(ID_IM_Instr),
+                     .StallReq(StallReq)
+                 );
+                 
      ControlUnit CUID (
                      .InstrCodes({
                          ID_IM_Instr[31:25],   // funct7
@@ -175,7 +200,7 @@ struct packed {
     pipe_ID_EX ID_EX (
         .Clk(Clk),
         .Rst(Rst),
-        .Flush(1'b0),
+        .Flush(ID_EX_Flush),
 
         .PC4_in(ID_PC_PCnext),
         .Rs1_in(RB_DataOut1),
