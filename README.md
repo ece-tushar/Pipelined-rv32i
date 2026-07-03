@@ -37,3 +37,7 @@ Implement branch support in 5-stage RV32I pipeline
 - Added pipeline flush on taken branches
 - Added PC pipelining and branch target feedback
 - Verified branch execution, forwarding, and load hazards through regression tests
+
+---
+
+- Added branch handling, JAL/JALR and control hazard support
