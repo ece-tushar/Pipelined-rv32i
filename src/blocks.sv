@@ -567,36 +567,43 @@ endmodule
 module RegBank32 #(
     parameter DATA_WIDTH = 32,
     parameter REG_ADDR_WIDTH = 5
-    )(input [DATA_WIDTH-1:0] DataIn,
-      input Clk, Rst, WEn,
-      input [REG_ADDR_WIDTH-1:0]RAddr1, RAddr2, WAddr,
-      output [DATA_WIDTH-1:0] DataOut1 , DataOut2
-      );
-      
-    reg [DATA_WIDTH-1:0] mem [0:2**(REG_ADDR_WIDTH)-1];
-    
+    )(
+    input  [DATA_WIDTH-1:0] DataIn,
+    input  Clk, Rst, WEn,
+    input  [REG_ADDR_WIDTH-1:0] RAddr1, RAddr2, WAddr,
+    output [DATA_WIDTH-1:0] DataOut1, DataOut2
+    );
+
+    reg [DATA_WIDTH-1:0] mem [0:(2**REG_ADDR_WIDTH)-1];
+
     integer i;
-    
-    always @ (posedge Clk) begin
+
+    always @(posedge Clk) begin
         if (Rst) begin
-            for (i = 0; i < 2**REG_ADDR_WIDTH; i = i + 1) begin
+            for (i = 0; i < 2**REG_ADDR_WIDTH; i = i + 1)
                 mem[i] <= 32'b0;
-                end
         end
-        else if (WEn && (WAddr != 5'b0)) begin
+        else if (WEn && (WAddr != 5'd0)) begin
             mem[WAddr] <= DataIn;
-            end
+        end
     end
-    
+
 //    initial begin
-//        $readmemh("regdata.mem",mem);
-//        end
-    
-    assign DataOut1 = mem[RAddr1];
-    assign DataOut2 = mem[RAddr2];
-    
-endmodule
-            
+//        $readmemh("regdata.mem", mem);
+//    end
+
+    // Write-first read ports
+    assign DataOut1 =
+        (WEn && (WAddr != 5'd0) && (WAddr == RAddr1))
+            ? DataIn
+            : mem[RAddr1];
+
+    assign DataOut2 =
+        (WEn && (WAddr != 5'd0) && (WAddr == RAddr2))
+            ? DataIn
+            : mem[RAddr2];
+
+endmodule     
 
 module PCBlock#(
    parameter DATA_WIDTH = 8
@@ -696,4 +703,3 @@ module ByteAdrRAM #(
                      .RAddr2(temp_raddr[2]),.RAddr3(temp_raddr[3]));
 
 endmodule
-
