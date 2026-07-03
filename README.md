@@ -15,3 +15,14 @@ Under development.
 - Added PC and IF/ID write enable support for controlled pipeline stalling.
 - Bug discovered on sourcing a register being WB on the same cycle.
 - solved by make regbank explicitly write first. 
+
+---
+
+Pipeline data hazards complete
+
+- Implement write-first register file
+- Add EX/MEM and MEM/WB operand forwarding
+- Add load-use hazard detection and pipeline stall
+- Add store forwarding
+- Verify loads and stores
+- Pass comprehensive pipeline regression
