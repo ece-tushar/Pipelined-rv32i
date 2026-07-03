@@ -79,6 +79,8 @@ struct packed {
     wire PC_WEn;
     wire IF_ID_WEn;
     
+    wire StrFwd;
+    
     wire [DATA_WIDTH-1:0] ALU_DataOut;
 
     wire [DATA_WIDTH-1:0] RB_DataOut1;
@@ -89,6 +91,7 @@ struct packed {
     wire [DATA_WIDTH-1:0] MUX_ALU_DataOut2;
     wire [DATA_WIDTH-1:0] MUX_ALU_DataOut1;
 
+    wire [DATA_WIDTH-1:0] DM_DataIn;
     wire [DATA_WIDTH-1:0] DM_DataOut;
 
     wire [DATA_WIDTH-1:0] SE_DataOut;
@@ -310,9 +313,19 @@ pipe_EX_MEM EX_MEM (
 //==================================================
 // M E M O R Y    A C C E S S  
 //==================================================      
-        
+      StoreForwardUnit SFU (
+               .MEM_IM_Instr(MEM_IM_Instr),
+               .WB_IM_Instr(WB_IM_Instr),
+               .StrFwd(StrFwd)
+                         );
+                         
+      mux2to1 # (.DATA_WIDTH(32)) 
+            MUX_DM (.DataIn0(MEM_RB_DataOut2),
+                    .DataIn1(MUX_RB_DataOut),
+                    .Sel(StrFwd),
+                    .DataOut(DM_DataIn));   
            
-     ByteAdrRAM DM (.DataIn(MEM_RB_DataOut2),  
+     ByteAdrRAM DM (.DataIn(DM_DataIn),  
                .Clk(Clk),
                .WEn(Ctrl.MEM_out.DataMemWEn),
                .WDataType(Ctrl.MEM_out.DataMemWDataType),
