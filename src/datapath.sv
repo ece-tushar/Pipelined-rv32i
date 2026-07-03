@@ -1,7 +1,7 @@
-// Dropping support for LUI/AUIPC. 
-// Jalr doesn't mask the last bit. 
-
-// simplify the control units for each stage later, old code reused right now. 
+// Current limitations:
+// Dropping support for LUI/AUIPC .
+// JALR target alignment masking not implemented.
+// No exception or trap handling.
 
 module DataPath #(
     parameter DATA_WIDTH=32,
@@ -20,22 +20,21 @@ module DataPath #(
     wire [DATA_WIDTH-1:0] IM_Instr; // the entire instruction
     
     wire [PC_DATA_WIDTH-1:0] ID_PC_RAddr;  // Out of IF_ID
-    wire [PC_DATA_WIDTH-1:0] ID_PC_PCnext;
     wire [DATA_WIDTH-1:0] ID_IM_Instr;
     wire [FUNC_WIDTH-1:0] ID_ControlKey;
 
-    wire [PC_DATA_WIDTH-1:0] EX_PC_PCnext; // Out of ID_EX 
+    wire [PC_DATA_WIDTH-1:0] EX_PC_RAddr; // Out of ID_EX 
     wire [DATA_WIDTH-1:0] EX_IM_Instr;
     wire [DATA_WIDTH-1:0] EX_RB_DataOut1;
     wire [DATA_WIDTH-1:0] EX_RB_DataOut2;
     wire [DATA_WIDTH-1:0] EX_IG_ImmOut;
     
-    wire [PC_DATA_WIDTH-1:0] MEM_PC_PCnext; // Out of EX_MEM 
+    wire [PC_DATA_WIDTH-1:0] MEM_PC_RAddr; // Out of EX_MEM 
     wire [DATA_WIDTH-1:0] MEM_IM_Instr;
     wire [DATA_WIDTH-1:0] MEM_ALU_DataOut;
     wire [DATA_WIDTH-1:0] MEM_RB_DataOut2;
     
-    wire [PC_DATA_WIDTH-1:0] WB_PC_PCnext; // Out of MEM_WB 
+    wire [PC_DATA_WIDTH-1:0] WB_PC_RAddr; // Out of MEM_WB 
     wire [DATA_WIDTH-1:0] WB_SE_DataOut;
     wire [DATA_WIDTH-1:0] WB_ALU_DataOut;
     wire [DATA_WIDTH-1:0] WB_IM_Instr;
@@ -83,6 +82,8 @@ struct packed {
     
     wire StrFwd;
     
+    wire [PC_DATA_WIDTH-1:0] WB_PCPlus4;  
+    
     wire [DATA_WIDTH-1:0] ALU_DataOut;
 
     wire [DATA_WIDTH-1:0] RB_DataOut1;
@@ -125,7 +126,7 @@ struct packed {
                  .Immediate(EX_IG_ImmOut[7:0]),   
                  .PCnext(PC_PCnext),
                  .MainALUData(ALU_DataOut[7:0]),
-                 .BranchPC(EX_PC_PCnext),
+                 .BranchPC(EX_PC_RAddr),
                  .AddrOutPC(PC_RAddr));
     
      ByteAdrRAM IM (.DataIn(),  // loading from a .mem file so no need
@@ -144,12 +145,10 @@ struct packed {
                         .Flush  (IF_ID_Flush),
                         .WEn(IF_ID_WEn),
                     
-                        .PC_in  (),    
-                        .PC4_in (PC_RAddr),
+                        .PC_in  (PC_RAddr),    
                         .IM_in  (IM_Instr),
                     
-                        .PC_out (),
-                        .PC4_out(ID_PC_PCnext),
+                        .PC_out (ID_PC_RAddr),
                         .IM_out (ID_IM_Instr)
                     );
 
@@ -175,7 +174,7 @@ struct packed {
                          ID_IM_Instr[6:0]      // opcode
                      }),
                  
-                     .ALUOutLSB(ALU_DataOut[0]),
+                     .ALUOutLSB(),
                      // ID
                      .ImmInstrType(Ctrl.ID_out.ImmInstrType),
                      // EX
@@ -210,13 +209,13 @@ struct packed {
         .Rst(Rst),
         .Flush(ID_EX_Flush),
 
-        .PC4_in(ID_PC_PCnext),
+        .PC_in(ID_PC_RAddr),
         .Rs1_in(RB_DataOut1),
         .Rs2_in(RB_DataOut2),
         .Imm_in(IG_ImmOut),
         .IM_in(ID_IM_Instr),
 
-        .PC4_out(EX_PC_PCnext),
+        .PC_out(EX_PC_RAddr),
         .Rs1_out(EX_RB_DataOut1),
         .Rs2_out(EX_RB_DataOut2),
         .Imm_out(EX_IG_ImmOut),
@@ -245,7 +244,7 @@ struct packed {
    
        mux4to1 #(.DATA_WIDTH(32)) 
        MUX_ALU1 (.DataIn0(EX_RB_DataOut1),
-               .DataIn1({{(DATA_WIDTH-PC_DATA_WIDTH){1'b0}},ID_PC_RAddr}),
+               .DataIn1({{(DATA_WIDTH-PC_DATA_WIDTH){1'b0}},EX_PC_RAddr}),
                .DataIn2(MEM_ALU_DataOut),
                .DataIn3(MUX_RB_DataOut),
                .Sel(Ctrl.EX_out.SelOprd1),
@@ -280,7 +279,7 @@ struct packed {
                             EX_IM_Instr[6:0]      // opcode
                                   }),
                               
-                        .ALUOutLSB(ALU_DataOut[0]),
+                        .ALUOutLSB(),
                         // ID
                         .ImmInstrType(),
                         // EX
@@ -313,12 +312,12 @@ pipe_EX_MEM EX_MEM (
                       .Rst(Rst),
                       .Flush(1'b0),
                   
-                      .PC4_in(EX_PC_PCnext),
+                      .PC_in(EX_PC_RAddr),
                       .Rs2_in(EX_RB_DataOut2),
                       .ALU_in(ALU_DataOut),
                       .IM_in(EX_IM_Instr),
                   
-                      .PC4_out(MEM_PC_PCnext),
+                      .PC_out(MEM_PC_RAddr),
                       .Rs2_out(MEM_RB_DataOut2),
                       .ALU_out(MEM_ALU_DataOut),
                       .IM_out(MEM_IM_Instr)
@@ -361,7 +360,7 @@ pipe_EX_MEM EX_MEM (
                          MEM_IM_Instr[6:0]      // opcode
                      }),
                  
-                     .ALUOutLSB(ALU_DataOut[0]),
+                     .ALUOutLSB(),
                      // ID
                      .ImmInstrType(),
                      // EX
@@ -386,12 +385,12 @@ pipe_EX_MEM EX_MEM (
                 .Rst(Rst),
                 .Flush(1'b0),
 
-                .PC4_in(MEM_PC_PCnext),
+                .PC_in(MEM_PC_RAddr),
                 .ALU_in(MEM_ALU_DataOut),
                 .DM_in(SE_DataOut),
                 .IM_in(MEM_IM_Instr),
 
-                .PC4_out(WB_PC_PCnext),
+                .PC_out(WB_PC_RAddr),
                 .ALU_out(WB_ALU_DataOut),
                 .DM_out(WB_SE_DataOut),
                 .IM_out(WB_IM_Instr)
@@ -408,7 +407,7 @@ pipe_EX_MEM EX_MEM (
                     WB_IM_Instr[6:0]      // opcode
                   }),
                  
-                 .ALUOutLSB(ALU_DataOut[0]),
+                 .ALUOutLSB(),
                  // ID
                  .ImmInstrType(),
                      // EX
@@ -427,13 +426,17 @@ pipe_EX_MEM EX_MEM (
                      .SelRegBankDataIn(Ctrl.WB_out.SelRegBankDataIn)
                  );
 
-    
+    PCAdder #(.DATA_WIDTH(PC_DATA_WIDTH)) 
+        WB_ADD4 (.DataIn0(WB_PC_RAddr),
+                 .DataIn1(8'd4),
+                 .AddrOutPC(WB_PCPlus4)
+                );
     
           
     mux4to1 #(.DATA_WIDTH(32)) 
             MUX_RB (.DataIn0(WB_ALU_DataOut),
                      .DataIn1(WB_SE_DataOut),
-                     .DataIn2({{(DATA_WIDTH-PC_DATA_WIDTH){1'b0}}, WB_PC_PCnext}),
+                     .DataIn2({{(DATA_WIDTH-PC_DATA_WIDTH){1'b0}},WB_PCPlus4}),
                      .DataIn3(EX_IG_ImmOut),
                      .Sel(Ctrl.WB_out.SelRegBankDataIn),
                      .DataOut(MUX_RB_DataOut));
