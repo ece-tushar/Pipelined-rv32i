@@ -76,6 +76,16 @@ module BranchController # (
                 SelAdderPC  = 1;
                 BranchTaken = 1;
             end
+            JAL_Jtype:
+             begin
+                SelAdderPC  = 1;
+                BranchTaken = 1;
+            end
+            JALR_Itype:
+             begin
+                SelDataInPC  = 1;
+                BranchTaken = 1;
+            end
  
     
         endcase
@@ -120,7 +130,11 @@ StrFwd = 0;
     case (n_opcode)
 
     Stype : begin
-        if (((n_1_opcode == Load_Itype) || (n_1_opcode == Rtype) || (n_1_opcode == R_Itype)) &&
+        if (((n_1_opcode == Load_Itype) || 
+             (n_1_opcode == Rtype) || 
+            (n_1_opcode == R_Itype) || 
+            (n_1_opcode == JALR_Itype) ||
+            (n_1_opcode == JAL_Jtype)) &&
             (n_1_rd != 5'd0) &&
             (n_1_rd == n_rs2))
             StrFwd = 1;
@@ -176,7 +190,7 @@ module LoadHazardUnit # (
                 StallReq = 1;
         end
     
-        R_Itype,Stype: begin
+        R_Itype,Stype,JALR_Itype: begin
             if ((n_1_opcode == Load_Itype) &&
                 (n_1_rd != 5'd0) &&
                 (n_1_rd == n_rs1))
@@ -239,30 +253,38 @@ module ForwardingUnit # (
             // Operand 1 (rs1)
                 if ((n_1_opcode == Rtype ||
                     n_1_opcode == R_Itype ||
-                    n_1_opcode == Load_Itype) &&
+                    n_1_opcode == Load_Itype ||
+                    n_1_opcode == JALR_Itype ||
+                    n_1_opcode == JAL_Jtype) &&
                     (n_1_rd != 5'd0) &&
                     (n_1_rd == n_rs1))
                         SelOprd1 = 2'b10;
 
                 else if ((n_2_opcode == Rtype ||
-                    n_2_opcode == R_Itype ||
-                    n_2_opcode == Load_Itype) &&
-                    (n_2_rd != 5'd0) &&
-                    (n_2_rd == n_rs1))
-                        SelOprd1 = 2'b11;
+                          n_2_opcode == R_Itype ||
+                          n_2_opcode == Load_Itype ||
+                          n_2_opcode == JALR_Itype ||
+                          n_2_opcode == JAL_Jtype) &&
+                         (n_2_rd != 5'd0) &&
+                         (n_2_rd == n_rs1))
+                            SelOprd1 = 2'b11;
 
             // Operand 2 (rs2)
 
                 if ((n_1_opcode == Rtype ||
                     n_1_opcode == R_Itype ||
-                    n_1_opcode == Load_Itype) &&
+                    n_1_opcode == Load_Itype ||
+                    n_1_opcode == JALR_Itype ||
+                    n_1_opcode == JAL_Jtype) &&
                     (n_1_rd != 5'd0) &&
                     (n_1_rd == n_rs2))
                         SelOprd2 = 2'b10;
 
                 else if ((n_2_opcode == Rtype ||
                     n_2_opcode == R_Itype ||
-                    n_2_opcode == Load_Itype) &&
+                    n_2_opcode == Load_Itype ||
+                    n_2_opcode == JALR_Itype ||
+                    n_2_opcode == JAL_Jtype) &&
                     (n_2_rd != 5'd0) &&
                     (n_2_rd == n_rs2))
                         SelOprd2 = 2'b11;
@@ -271,7 +293,7 @@ module ForwardingUnit # (
     // Instructions using rs1 + Immediate
 
             R_Itype,
-            Load_Itype,
+            Load_Itype,JALR_Itype,
             Stype: begin
 
                 // Operand 2 is immediate
@@ -281,14 +303,18 @@ module ForwardingUnit # (
 
                 if ((n_1_opcode == Rtype ||
                     n_1_opcode == R_Itype ||
-                    n_1_opcode == Load_Itype) &&
+                    n_1_opcode == Load_Itype ||
+                    n_1_opcode == JALR_Itype ||
+                    n_1_opcode == JAL_Jtype) &&
                     (n_1_rd != 5'd0) &&
                     (n_1_rd == n_rs1))
                         SelOprd1 = 2'b10;
 
                 else if ((n_2_opcode == Rtype ||
                         n_2_opcode == R_Itype ||
-                        n_2_opcode == Load_Itype) &&
+                        n_2_opcode == Load_Itype ||
+                        n_2_opcode == JALR_Itype ||
+                        n_2_opcode == JAL_Jtype) &&
                         (n_2_rd != 5'd0) &&
                         (n_2_rd == n_rs1))
                        SelOprd1 = 2'b11;
@@ -305,9 +331,6 @@ module ForwardingUnit # (
 end
 
 endmodule
-
-
-
 
 
 module SignExtender # (
