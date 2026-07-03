@@ -1,16 +1,87 @@
 module PipelineControl(
     input  logic StallReq,
+    input  logic BranchTaken,
 
     output logic PC_WEn,
     output logic IF_ID_WEn,
-    output logic ID_EX_Flush
+    output logic ID_EX_Flush,
+    output logic IF_ID_Flush
 );
 
-assign PC_WEn      = ~StallReq;
-assign IF_ID_WEn   = ~StallReq;
-assign ID_EX_Flush =  StallReq;
+    // PC_WEn = 1
+    // IF_ID_WEn = 1
+    // ID_EX_Flush = 0
+    // IF_ID_Flush = 0
+
+    always_comb begin
+    
+        PC_WEn      = 1;
+        IF_ID_WEn   = 1;
+        IF_ID_Flush = 0;
+        ID_EX_Flush = 0;
+    
+        if (StallReq) begin
+            PC_WEn      = 0;
+            IF_ID_WEn   = 0;
+            ID_EX_Flush = 1;
+        end
+    
+        else if (BranchTaken) begin
+            IF_ID_Flush = 1;
+            ID_EX_Flush = 1;
+        end
+    
+    end
+
 
 endmodule
+
+module BranchController # (
+    parameter DATA_WIDTH = 32,
+    parameter [6:0]
+        Rtype      = 7'b0110011,
+        R_Itype    = 7'b0010011,
+        Load_Itype = 7'b0000011,
+        Stype      = 7'b0100011,
+        Btype      = 7'b1100011,
+        LUI        = 7'b0110111,
+        AUIPC      = 7'b0010111,
+        JAL_Jtype  = 7'b1101111,
+        JALR_Itype = 7'b1100111,
+        Envi_Itype = 7'b1110011
+
+    )(
+    input logic [DATA_WIDTH-1:0] EX_IM_Instr,
+    input logic ALU_LSB,
+    
+    output logic SelAdderPC,
+    output logic SelDataInPC,
+    output logic BranchTaken   // which is a FlushReq for pipeline controller. 
+    );
+    
+    logic [6:0] opcode;
+    
+    assign opcode = EX_IM_Instr[6:0];
+    
+    always_comb begin
+ 
+        SelAdderPC = 0;
+        SelDataInPC = 0;
+        BranchTaken = 0;
+        
+        case (opcode)
+    
+            Btype:
+            if (ALU_LSB) begin
+                SelAdderPC  = 1;
+                BranchTaken = 1;
+            end
+ 
+    
+        endcase
+    end
+endmodule
+
 
 module StoreForwardUnit # (parameter DATA_WIDTH = 32,
 
@@ -98,7 +169,7 @@ module LoadHazardUnit # (
     
         case (n_opcode)
     
-        Rtype: begin
+        Rtype,Btype: begin
             if ((n_1_opcode == Load_Itype) &&
                 (n_1_rd != 5'd0) &&
                 ((n_1_rd == n_rs1) || (n_1_rd == n_rs2)))
@@ -164,7 +235,7 @@ module ForwardingUnit # (
 
         case (n_opcode)
             // Instructions using BOTH rs1 and rs2
-            Rtype: begin
+            Rtype,Btype: begin
             // Operand 1 (rs1)
                 if ((n_1_opcode == Rtype ||
                     n_1_opcode == R_Itype ||
@@ -664,6 +735,7 @@ module PCBlock#(
     input Clk,Rst,PC_WEn,
     input [DATA_WIDTH-1:0] Immediate,
     input [DATA_WIDTH-1:0] MainALUData,
+    input [DATA_WIDTH-1:0] BranchPC,
     output [DATA_WIDTH-1:0] PCnext,
     output [DATA_WIDTH-1:0] AddrOutPC
     );
@@ -677,7 +749,7 @@ module PCBlock#(
               .Sel(SelAdderPC),.DataOut(temp_mux1_mux2));
                  
     PCAdder  #(.DATA_WIDTH(DATA_WIDTH)) ADDImm
-              (.DataIn0(Immediate),.DataIn1(AddrOutPC),
+              (.DataIn0(Immediate),.DataIn1(BranchPC),
                .AddrOutPC(temp_adder_1));
     
     PCAdder  #(.DATA_WIDTH(DATA_WIDTH)) ADD4
