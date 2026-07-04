@@ -1,6 +1,7 @@
 # Upgrading a single cycle processor to a 5 stage pipelined processor
 
-Under development. 
+Main framework complete, patch-up work left. 
+ 
 - Added IF_ID pipeline registers
 - Adder ID_EX pipeline registers
 - Dropped support for LUI/AUIPC for now.
