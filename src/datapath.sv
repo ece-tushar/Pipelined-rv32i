@@ -236,11 +236,7 @@ struct packed {
                 .BranchTaken(BranchTaken)
                 );
 
-//     mux2to1 # (.DATA_WIDTH(32)) 
-//    MUX_ALU0 (.DataIn0(EX_RB_DataOut1),
-//           .DataIn1({{(DATA_WIDTH-PC_DATA_WIDTH){1'b0}},ID_PC_RAddr}),  // PC isn't pipelined so dropped LUI / AUIPC
-//           .Sel(Ctrl.EX_out.SelMuxALU0),
-//           .DataOut(MUX_ALU_DataOut0));
+
    
        mux4to1 #(.DATA_WIDTH(32)) 
        MUX_ALU1 (.DataIn0(EX_RB_DataOut1),
@@ -259,13 +255,6 @@ struct packed {
                .DataOut(MUX_ALU_DataOut2));                      
 
     
-    
-//    mux2to1 # (.DATA_WIDTH(32)) 
-//           MUX_ALU (.DataIn0(EX_RB_DataOut2),
-//                  .DataIn1(EX_IG_ImmOut),
-//                  .Sel(Ctrl.EX_out.SelMuxALU),
-//                  .DataOut(MUX_ALU_DataOut2));
-
 
      ALU ALU_UUT (.DataIn1(MUX_ALU_DataOut1),
                   .DataIn2(MUX_ALU_DataOut2),
