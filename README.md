@@ -1,43 +1,24 @@
-# Upgrading a single cycle processor to a 5 stage pipelined processor
+# 5-Stage Pipelined RV32I Processor
 
-Under development. 
-- Added IF_ID pipeline registers
-- Adder ID_EX pipeline registers
-- Dropped support for LUI/AUIPC for now.
-- branches/jumps will be impplemented after complete pipeline implementation. 
-- Basic pipeline implementation complete.
-- Hazards handling / branch control under implementation.
-- Moved from ID stage decoding to per stage decoding, simplifes later upgradations. 
-- Added R/R-I type Forwarding unit
-- Added load-use hazard detection unit.
-- Implemented one-cycle pipeline stall with bubble insertion.
-- Introduced centralized pipeline control for future hazard/branch handling.
-- Added PC and IF/ID write enable support for controlled pipeline stalling.
-- Bug discovered on sourcing a register being WB on the same cycle.
-- solved by make regbank explicitly write first. 
+## Overview
 
----
+This project implements a 5-stage pipelined RV32I processor in Verilog. It supports the core RV32I instruction subset, data forwarding, hazard detection, and control hazard handling, enabling correct execution of pipelined programs. The design follows a modular datapath and control architecture, with each hardware block developed and verified independently before full processor integration.
 
-Pipeline data hazards complete
 
-- Implement write-first register file
-- Add EX/MEM and MEM/WB operand forwarding
-- Add load-use hazard detection and pipeline stall
-- Add store forwarding
-- Verify loads and stores
-- Pass comprehensive pipeline regression
+## Project Evolution
 
----
+This processor was developed as an extension of a previously completed single-cycle RV32I processor. The original single-cycle implementation was completed in approximately **17 days**, after which it was upgraded into a fully pipelined design over the course of **5 days**. Rather than redesigning the processor from scratch, the existing datapath components—including the ALU, register file, memories, controller, and immediate generator—were reused and integrated into a 5-stage pipeline with the addition of forwarding logic, hazard detection, pipeline control, and branch/jump support.  
 
-Implement branch support in 5-stage RV32I pipeline
+A single monolithic decoder/controller had become very restrictive for a pipelined implementation. So, early in developement, major refactoring work was done to convert it to per-stage decoding. This made implementation and debugging a lot easier, since each decoder is response for its own stage, bugs could be narrowed down very easily. This approach greatly improves modularity for future additions. 
 
-- Added branch forwarding support
-- Added load-to-branch hazard detection
-- Implemented BranchController
-- Added pipeline flush on taken branches
-- Added PC pipelining and branch target feedback
-- Verified branch execution, forwarding, and load hazards through regression tests
+## Features
 
----
-
-- Added branch handling, JAL/JALR and control hazard support
+- Classic 5-stage in-order pipeline (IF, ID, EX, MEM, WB)
+- Modular datapath and stage-wise control architecture
+- Dedicated pipeline controller for stall and flush management
+- Byte-addressable instruction and data memory
+- Write-first register file
+- Immediate generation for all supported instruction formats
+- Load-use hazard detection
+- Store data and store address forwarding
+- Control hazard handling with pipeline flushing
