@@ -67,3 +67,14 @@ The processor incorporates dedicated hardware units to resolve both data and con
 * **Branch Controller** – Evaluates branch conditions, generates branch/jump targets, and issues pipeline redirect requests.
 * **Pipeline Controller** – Centralizes pipeline control by coordinating stalls, pipeline flushing, and other control actions required for correct pipeline execution.
 
+## Verification
+
+The processor was verified using a bottom-up verification methodology, beginning with individual hardware blocks before progressing to full pipeline integration.
+
+* ✔️ Self-checking Verilog testbenches for all major hardware modules.
+* ✔️ Independent verification of ALU, Register File, Memories, Immediate Generator, Controllers, and Pipeline Registers.
+* ✔️ Incremental pipeline integration with feature-by-feature regression testing.
+* ✔️ Dedicated regression programs for forwarding, load hazards, store hazards, branches, `JAL`, and `JALR`.
+* ✔️ End-to-end processor verification using complete assembly programs.
+* ✔️ Successful execution of a subtraction-based Euclidean GCD algorithm as the final functional validation.
+* ✔️ Extensive waveform-based debugging and regression testing throughout development.
