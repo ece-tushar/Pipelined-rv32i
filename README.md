@@ -27,6 +27,20 @@ A single monolithic decoder/controller had become very restrictive for a pipelin
 
 ![Processor Architecture](images/archi_draw.png)
 
+## Key Design Decisions
+
+Throughout development, several architectural refactoring decisions were made to improve the scalability and maintainability of the processor:
+
+* **Modular Pipeline Control** – The original monolithic controller was decomposed into dedicated hardware modules, including the Forwarding Unit, Load Hazard Unit, Store Forward Unit, Branch Controller, and Pipeline Controller. This separation of responsibilities simplified debugging and enabled independent feature development.
+
+* **Stage-wise Instruction Decoding** – Centralized instruction decoding was replaced with per-stage decoding, allowing each pipeline stage to decode only the information it required. This significantly improved modularity and eased the addition of new instructions.
+
+* **Write-First Register File** – The register file was redesigned to support write-first behavior, eliminating WB→ID read-after-write hazards without introducing additional forwarding paths.
+
+* **Operand-Oriented Forwarding Architecture** – Rather than forwarding based solely on instruction type, the forwarding logic was reorganized around ALU operand usage. This naturally accommodated stores, branches, and jump instructions while reducing duplicated logic.
+
+* **Incremental Feature Verification** – New pipeline features were introduced and verified one at a time using dedicated regression programs and version-controlled checkpoints. This approach greatly simplified debugging and prevented architectural regressions during development.
+
 ## Supported Instructions
 
 | Category | Instructions                                         |
