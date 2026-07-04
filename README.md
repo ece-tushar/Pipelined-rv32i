@@ -37,3 +37,19 @@ A single monolithic decoder/controller had become very restrictive for a pipelin
 | Store    | SB, SH, SW                                           |
 | Branch   | BEQ, BNE, BLT, BGE, BLTU, BGEU                       |
 | Jump     | JAL, JALR                                            |
+
+## Hazard Handling
+
+The processor incorporates dedicated hardware units to resolve both data and control hazards while maintaining pipeline correctness.
+
+### Data Hazard Resolution
+
+* **Forwarding Unit** – Resolves RAW data hazards by forwarding results from the EX/MEM and MEM/WB pipeline stages directly to the ALU operands. This also resolves store address (`rs1`) dependencies during address calculation.
+* **Load Hazard Unit** – Detects load-use hazards that cannot be resolved through forwarding and requests a single-cycle pipeline stall.
+* **Store Forward Unit** – Implements dedicated forwarding for store data (`rs2`), allowing recently computed values to be written to memory without stalling.
+
+### Control Hazard Resolution
+
+* **Branch Controller** – Evaluates branch conditions, generates branch/jump targets, and issues pipeline redirect requests.
+* **Pipeline Controller** – Centralizes pipeline control by coordinating stalls, pipeline flushing, and other control actions required for correct pipeline execution.
+
