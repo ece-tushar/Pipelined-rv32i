@@ -26,7 +26,6 @@ Pipeline data hazards complete
 - Add load-use hazard detection and pipeline stall
 - Add store forwarding
 - Verify loads and stores
-- Pass comprehensive pipeline regression
 
 ---
 
